@@ -16,6 +16,8 @@ targets = train_solution[:,1:]
 targets_mean = targets[:,1:].mean(axis = 1)
 N = targets.shape[0]
 
+# ceci est un test pour github
+
 df=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train.npy\\data_train.npy")
 dfFGS=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train_FGS.npy")
 
