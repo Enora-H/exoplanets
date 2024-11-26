@@ -18,6 +18,8 @@ N = targets.shape[0]
 
 # ceci est un test pour github
 
+#ceci est un test pour github en passant par vscode
+
 df=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train.npy\\data_train.npy")
 dfFGS=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train_FGS.npy")
 
