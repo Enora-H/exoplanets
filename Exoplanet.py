@@ -17,7 +17,7 @@ targets_mean = targets[:,1:].mean(axis = 1)
 N = targets.shape[0]
 
 # allo je viens de changer un truc svp
-#ceci est un test pour github en passant par vscode
+# allo2
 
 df=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train.npy\\data_train.npy")
 dfFGS=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train_FGS.npy")
