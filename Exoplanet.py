@@ -18,6 +18,9 @@ N = targets.shape[0]
 
 # allo je viens de changer un truc svp
 # allo2
+# là c'est Claire qui fait un test
+
+
 
 df=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train.npy\\data_train.npy")
 dfFGS=np.load("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\data_train_FGS.npy")
