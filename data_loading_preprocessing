@@ -1,4 +1,4 @@
-''' Attention : tous les chemins d'accès spécifiés sont ceux de ma clé USB (test sur une exoplanet)'''
+''' Attention : tous les chemins d'accès spécifiés sont ceux de ma clé USB (test sur deux exoplanets)'''
 
 ''' Libraries '''
 import pandas as pd
@@ -92,12 +92,12 @@ def preproc(dataset, adc_info, sensor, binning = 15):
 
     feats = []
     for i, planet_id in tqdm(list(enumerate(planet_ids))):
-        signal = pd.read_parquet(f'E:/{sensor}_signal.parquet').to_numpy()
-        dark_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/dark.parquet', engine='fastparquet').to_numpy()
-        dead_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/dead.parquet', engine='fastparquet').to_numpy()
-        flat_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/flat.parquet', engine='fastparquet').to_numpy()
-        read_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/read.parquet', engine='fastparquet').to_numpy()
-        linear_corr = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/linear_corr.parquet').values.astype(np.float64).reshape(linear_corr_dict[sensor])
+        signal = pd.read_parquet(f'E:/{dataset}/{planet_id}/{sensor}_signal.parquet').to_numpy()
+        dark_frame = pd.read_parquet(f'E:/{dataset}/{planet_id}/' + sensor + '_calibration/dark.parquet', engine='fastparquet').to_numpy()
+        dead_frame = pd.read_parquet(f'E:/{dataset}/{planet_id}/' + sensor + '_calibration/dead.parquet', engine='fastparquet').to_numpy()
+        flat_frame = pd.read_parquet(f'E:/{dataset}/{planet_id}/' + sensor + '_calibration/flat.parquet', engine='fastparquet').to_numpy()
+        read_frame = pd.read_parquet(f'E:/{dataset}/{planet_id}/' + sensor + '_calibration/read.parquet', engine='fastparquet').to_numpy()
+        linear_corr = pd.read_parquet(f'E:/{dataset}/{planet_id}/' + sensor + '_calibration/linear_corr.parquet').values.astype(np.float64).reshape(linear_corr_dict[sensor])
 
         signal = signal.reshape(sensor_sizes_dict[sensor][0])
         gain = adc_info[f'{sensor}_adc_gain'].values[i]
