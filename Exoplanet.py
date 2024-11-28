@@ -15,7 +15,7 @@ train_solution = np.loadtxt("C:\\Users\\marca\\Desktop\\École\\2IA\\exoplanet\\
 targets = train_solution[:,1:]
 targets_mean = targets[:,1:].mean(axis = 1)
 N = targets.shape[0]
-#test marca
+#test marca2
 # allo je viens de changer un truc svp
 # allo2
 # là c'est Claire qui fait un test
