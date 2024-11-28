@@ -1,0 +1,166 @@
+''' Attention : tous les chemins d'accès spécifiés sont ceux de ma clé USB (test sur une exoplanet)'''
+
+''' Libraries '''
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
+import joblib
+
+from sklearn.linear_model import Ridge
+from sklearn.metrics import r2_score, mean_squared_error
+import itertools
+
+from scipy.optimize import minimize
+from scipy import optimize
+
+from astropy.stats import sigma_clip
+
+''' Data loading '''
+adc_info = pd.read_csv(r"E:\train_adc_info.csv", index_col='planet_id')
+adc_info = adc_info[:10] # only for training
+
+axis_info = pd.read_parquet(r"E:\axis_info.parquet", engine='fastparquet')
+
+''' Calibration steps '''
+dataset = 'train'
+
+def apply_linear_corr(linear_corr,clean_signal):
+    linear_corr = np.flip(linear_corr, axis=0)
+    for x, y in itertools.product(
+                range(clean_signal.shape[1]), range(clean_signal.shape[2])
+            ):
+        poli = np.poly1d(linear_corr[:, x, y])
+        clean_signal[:, x, y] = poli(clean_signal[:, x, y])
+    return clean_signal
+
+def clean_dark(signal, dark, dt):
+    dark = np.tile(dark, (signal.shape[0], 1, 1))
+    signal -= dark* dt[:, np.newaxis, np.newaxis]
+    return signal
+
+def mask_hot_dead(signal, dead, dark):
+    hot = sigma_clip(
+        dark, sigma=5, maxiters=5
+    ).mask
+    hot = np.tile(hot, (signal.shape[0], 1, 1))
+    dead = np.tile(dead, (signal.shape[0], 1, 1))
+    signal = np.ma.masked_where(dead, signal)
+    signal = np.ma.masked_where(hot, signal)
+    return signal
+
+def correct_flat_field(signal, flat):
+    flat = np.tile(flat, (signal.shape[0], 1))
+    signal = signal / flat
+    return signal
+
+def clean_read(signal, read):
+    read = np.tile(read * 2, (signal.shape[0], 1))
+    signal -= read
+    return signal
+
+def ADC_convert(signal, gain, offset):
+    return signal / gain + offset
+
+def get_cds(signal):
+    cds = signal[:,1::2,:,:] - signal[:,::2,:,:]
+    return cds
+
+def bin_obs(cds_signal,binning):
+    cds_transposed = cds_signal.transpose(0,1,3,2)
+    cds_binned = np.zeros((cds_transposed.shape[0], cds_transposed.shape[1]//binning, cds_transposed.shape[2], cds_transposed.shape[3]))
+    for i in range(cds_transposed.shape[1]//binning):
+        cds_binned[:,i,:,:] = np.sum(cds_transposed[:,i*binning:(i+1)*binning,:,:], axis=1)
+    return cds_binned
+
+def correct_flat_field(flat,dead, signal):
+    flat = flat.transpose(1, 0)
+    dead = dead.transpose(1, 0)
+    flat = np.ma.masked_where(dead, flat)
+    flat = np.tile(flat, (signal.shape[0], 1, 1))
+    signal = signal / flat
+    return signal
+
+''' Preprocessing '''
+
+def preproc(dataset, adc_info, sensor, binning = 15):
+    cut_inf, cut_sup = 39, 321
+    sensor_sizes_dict = {"AIRS-CH0":[[11250, 32, 356], [1, 32, cut_sup-cut_inf]], "FGS1":[[135000, 32, 32], [1, 32, 32]]}
+    binned_dict = {"AIRS-CH0":[11250 // binning // 2, 282], "FGS1":[135000 // binning // 2]}
+    linear_corr_dict = {"AIRS-CH0":(6, 32, 356), "FGS1":(6, 32, 32)}
+    planet_ids = [1011759019, 100468857] # = adc_info.index
+
+    feats = []
+    for i, planet_id in tqdm(list(enumerate(planet_ids))):
+        signal = pd.read_parquet(f'E:/{sensor}_signal.parquet').to_numpy()
+        dark_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/dark.parquet', engine='fastparquet').to_numpy()
+        dead_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/dead.parquet', engine='fastparquet').to_numpy()
+        flat_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/flat.parquet', engine='fastparquet').to_numpy()
+        read_frame = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/read.parquet', engine='fastparquet').to_numpy()
+        linear_corr = pd.read_parquet(f'E:/{planet_id}' + sensor + '_calibration/linear_corr.parquet').values.astype(np.float64).reshape(linear_corr_dict[sensor])
+
+        signal = signal.reshape(sensor_sizes_dict[sensor][0])
+        gain = adc_info[f'{sensor}_adc_gain'].values[i]
+        offset = adc_info[f'{sensor}_adc_offset'].values[i]
+        signal = ADC_convert(signal, gain, offset)
+
+        hot = sigma_clip(
+            dark_frame, sigma=5, maxiters=5
+        ).mask
+
+        if sensor != "FGS1":
+            signal = signal[:, :, cut_inf:cut_sup]
+            dt = np.ones(len(signal))*0.1
+            dt[1::2] += 4.5 #@bilzard idea
+            linear_corr = linear_corr[:, :, cut_inf:cut_sup]
+            dark_frame = dark_frame[:, cut_inf:cut_sup]
+            dead_frame = dead_frame[:, cut_inf:cut_sup]
+            flat_frame = flat_frame[:, cut_inf:cut_sup]
+            hot = hot[:, cut_inf:cut_sup]
+        else:
+            dt = np.ones(len(signal))*0.1
+            dt[1::2] += 0.1
+
+        # signal = signal.clip(0) #@graySnow idea
+        linear_corr_signal = apply_linear_corr(linear_corr, signal)
+        signal = clean_dark(linear_corr_signal, dark_frame, dt)
+
+        flat = flat_frame.reshape(sensor_sizes_dict[sensor][1])
+        flat[dead_frame.reshape(sensor_sizes_dict[sensor][1])] = np.nan
+        #flat[hot.reshape(sensor_sizes_dict[sensor][1])] = np.nan
+        signal = signal / flat
+
+
+        if sensor == "FGS1":
+            signal = signal[:,10:22,10:22] # **** updates ****
+            signal = signal.reshape(sensor_sizes_dict[sensor][0][0],144) # # **** updates ****
+
+        if sensor != "FGS1":
+            # backgrounds are [0:8] and [24:32]
+            signal_bg = np.nanmean(
+                np.concatenate([signal[:, 0:8, :], signal[:, 24:32, :]], axis=1), axis=1
+            )
+            signal_bg[np.isnan(signal_bg)] = 0
+            signal = signal[:, 8:24, :]  # **** updates ****
+
+        mean_signal = np.nanmean(signal, axis=1)
+        cds_signal = mean_signal[1::2] - mean_signal[0::2]
+        cds_signal_bg = signal_bg[1::2] - signal_bg[0::2]
+
+        cds_signal_bg = np.nanmean(cds_signal_bg, axis=0, keepdims=True)
+
+        cds_signal -= cds_signal_bg
+
+        binned = np.zeros((binned_dict[sensor]))
+        for j in range(cds_signal.shape[0] // binning):
+            binned[j] = cds_signal[j * binning : j * binning + binning].mean(axis=0)
+
+        if sensor == "FGS1":
+            binned = binned.reshape((binned.shape[0], 1))
+
+        feats.append(binned)
+
+    return np.stack(feats)
+
+df = preproc(f'{dataset}', adc_info, "AIRS-CH0", 1) # d'après les notations de marca ?
+#dfFGS = preproc(f'{dataset}', adc_info, "FGS1", 1) # d'après les notations de marca ?
