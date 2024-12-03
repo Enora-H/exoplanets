@@ -2,3 +2,5 @@ data_train_FGS.npy
 data_train.npy
 train_labels.csv
 output/model_1dcnn.keras
+wavelengths.csv
+output/model_2dcnn.keras
