@@ -59,7 +59,6 @@ def preprocess_planet_data(planet_id, adc_info, sensor, calibration_steps):
     flat = pd.read_parquet(f'E:/{dataset}/{planet_id}/{sensor}_calibration/flat.parquet').to_numpy()
     read = pd.read_parquet(f'E:/{dataset}/{planet_id}/{sensor}_calibration/read.parquet').to_numpy()
     linear_corr = pd.read_parquet(f'E:/{dataset}/{planet_id}/{sensor}_calibration/linear_corr.parquet').values.astype(np.float64).reshape(linear_corr_dict[sensor])
-    read = pd.read_parquet(f'E:/{dataset}/{planet_id}/{sensor}_calibration/read.parquet').to_numpy()
 
     # ADC conversion
     gain = adc_info.loc[planet_id, f"{sensor}_adc_gain"]
